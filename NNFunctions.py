@@ -117,8 +117,9 @@ def getPredictions(model,data,normalize = False, roundtoint = False):
 
 ## Performs cross validation with the data and parameters passed in
 ## Returns hamming, subset accuracy, and weighted accurace averaged over the number of folds
-def get_cvError(traindata,lr,hsize,folds = 5):
+def get_cvError(traindata,lr,hsize,epochs = 200, folds = 5):
     kfolds = folds
+    denAuc = folds
     kf = KFold(n_splits=5)
     kf.get_n_splits(traindata)
     hamming,subsetacc, aucWeighted = 0, 0, 0
@@ -134,7 +135,7 @@ def get_cvError(traindata,lr,hsize,folds = 5):
         drugnet = Model(hsize)
         criterion = nn.BCELoss()
         optimizer = torch.optim.SGD(drugnet.parameters(), lr=lr)
-        results = train(drugnet,criterion,optimizer,trainloader,200,pinterval=50, p=False)
+        results = train(drugnet,criterion,optimizer,trainloader,epochs,pinterval=50, p=False)
 
         yhatTest = getPredictions(drugnet, testDataset,normalize=False,roundtoint=True)
         yTest = test[:,13:]
@@ -142,9 +143,15 @@ def get_cvError(traindata,lr,hsize,folds = 5):
         hamming += sklm.hamming_loss(yTest,yhatTest)
         subsetacc += sklm.accuracy_score(yTest,yhatTest)
         yhatTest = getPredictions(drugnet, testDataset,normalize=False,roundtoint=False)
-        aucWeighted += sklm.roc_auc_score(yTest,yhatTest,average='weighted')
+
+        try:
+            aucWeighted += sklm.roc_auc_score(yTest,yhatTest,average='weighted')
+        except ValueError:
+            denAuc -= 1
+            print("valerror", denAuc)
+            pass
     hamming = hamming/kfolds
     subsetacc = subsetacc/kfolds
-    aucWeighted = aucWeighted/kfolds
+    aucWeighted = aucWeighted/denAuc
     return(hamming,subsetacc,aucWeighted)
 
